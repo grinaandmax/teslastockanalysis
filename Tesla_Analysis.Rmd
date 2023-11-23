@@ -1,0 +1,198 @@
+---
+title: "Tesla Stock Analysis"
+logo: asu-logo.png
+author: "Grina Hwang"
+date: "2023-11-16"
+output: ioslides_presentation
+---
+
+
+<style>
+.gdbar img {
+width: 150px !important;
+height: 80px !important;
+margin: 8px 8px;
+}
+
+.gdbar {
+width: 200px !important;
+height: 100px !important;
+}
+
+</style>
+
+<style type="text/css">
+body, p, div, h1, h2, h3, h4, h5, ul {
+color.black;
+font-family: Modern Computer Roman;
+}
+h3 {
+color: #8C1D40;
+}
+
+</style>
+
+<style type="text/css">
+slides > slide {
+background: linear-gradient(#ffffff, #ffffff 85%, #ffffff);
+background-color: white;
+}
+</style>
+
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(echo = TRUE, comment = "", cache=F) 
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+install.packages("quantmod")
+install.packages("ggplot2")
+library(quantmod)
+library(ggplot2)
+```
+
+## Getting Started
+Importing the Data & Libraries <br>
+
+<font size="4">In this analysis, we are analyzing the stock trends on the electric car company, Tesla (stock symbol: TSLA) using data from Yahoo Finance. I utilized the "quantmod" package for financial modeling which I found through Google: https://cran.r-project.org/web/packages/quantmod/index.html. Additionally, I am using ggplot2 for data visualization. Setting up the environment involves installing and loading necessary packages, including setting a CRAN mirror with the official repository URL. <br>
+
+options(repos = c(CRAN = "https://cloud.r-project.org")) <br>
+install.packages("quantmod") <br>
+install.packages("ggplot2") <br>
+library(quantmod) <br>
+library(ggplot2) <br>
+</font>
+
+## getSymbols
+
+After installing and loading the packages, we use the getSymbols function to download the stock price series and preprocess the data for analysis.<br>
+\tiny
+```{r class.source = "small"}
+tesla <- getSymbols("TSLA", src = "yahoo", from = "2018-11-15", 
+to = "2023-11-15", auto.assign = FALSE)
+```
+
+
+## Quick Overview of the Data
+
+Before we jump into processing the data, let’s familiarize ourselves with the data we just imported.
+```{r, echo = F}
+tesla <- getSymbols("TSLA", src = "yahoo", from = "2018-11-15", to = "2023-11-15", auto.assign = FALSE)
+summary(tesla)
+```
+
+
+## Summary of Data
+- Index: The date of the data point. <br>
+- TSLA.Open: The opening stock price of Tesla on that date. <br>
+- TSLA.High: The highest stock price reached during the day. <br>
+- TSLA.Low: The lowest stock price reached during the day. <br>
+- TSLA.Close: The closing stock price of Tesla on that date. <br>
+- TSLA.Volume: The trading volume, representing the total number of shares traded on that date. <br>
+- TSLA.Adjusted: The adjusted closing price, which accounts for events such as stock splits and dividends.<br>
+
+
+## Tesla Price Series
+```{r, message = F, echo = F}
+ggplot(tesla, aes(x = index(tesla), y = tesla[,6])) + geom_line(color = "pink") + ggtitle("Tesla Prices Series") + xlab("Date") + ylab("Price") + theme(plot.title = element_text(hjust = 0.5)) + scale_x_date(date_labels = "%b %Y", date_breaks = "1 year")
+```
+
+## Price Series Analysis
+
+In the ggplot of the previous slide, I used the Adjusted Price column and it incorporates events like splits and dividends distribution, which can affect the series. <br><br>
+
+Visually, the plot shows the past 5 years with the minimum price being $8 and its highest peak was $411. <br>
+We can see that there is an upward trend and it has exploded since beginning of 2020.
+
+## Moving Average Formula
+
+\[MA^q_t = \frac{1}{q}\ \sum_{i=0}^{q-1} x_{t-1}\]
+
+<br>
+In stock technical analysis, the Moving Average is a commonly used technique involving the calculation of the arithmetic average of the last q days in a time series over the t time period. The moving average is valuable for trend identification and noise reduction in stock prices, with the responsiveness to price changes influenced by the chosen window size. It is best to calculate two moving averages for stock prices, one with a 10-day window and another with a 30-day window.
+
+
+## Tesla Moving Average
+<font size = "4">
+\[MA^q_t\] <center>The moving average at time t with a window size of q.<br></center>
+\[x_{t-1}\] <center>The closing price of Tesla stock at time t. </center>
+\[\sum_{i=0}^{q-1} x_{t-1}\] <center>The sum of the closing prices for the past q days, including the current day. </center> <br>
+
+The moving average for Tesla stock at time t with a window size of q is the average of the closing prices for the past q days.
+To calculate it, you would sum up the closing prices for the most recent q days and then divide the result by q. This gives you the average closing price over that time window which is the stock's price trend.
+</font>
+
+## Tesla Moving Average ggplot
+
+The process involves subsetting data from 2018 and using the rollmean() function to calculate a moving average for the adjusted price series. The function takes parameters such as the window of periods (q), optional fill values for incomplete calculations, and an alignment parameter to determine how the moving average is positioned relative to the day in the series. The resulting moving averages are added to two new columns in the original dataset. In Technical Analysis, if the moving averages of short (purple) and long term (cyan) cross each other, it is an indication of buying or selling the stock. When the short term moving average crosses the long term upwards, it's a buy signal. When the opposite happens, then it's a sell signal.
+
+
+## Tesla Moving Average
+```{r, message = F, warning = F, echo = F}
+
+# Subset Tesla data from 2013-11-15 to 2023-11-15
+tesla_mm <- subset(tesla, index(tesla) >= "2018-11-15" & index(tesla) <= "2023-11-15")
+
+# Calculate the moving averages
+tesla_mm$mm10 <- rollmean(Cl(tesla_mm), 10, fill = list(NA, NULL, NA), align = "right")
+tesla_mm$mm30 <- rollmean(Cl(tesla_mm), 30, fill = list(NA, NULL, NA), align = "right")
+
+# Plot using ggplot2
+ggplot(tesla_mm, aes(x = index(tesla_mm))) +
+  geom_line(aes(y = Cl(tesla_mm), color = "Tesla Stock Price")) +
+  geom_line(aes(y = tesla_mm$mm10, color = "10-Day Moving Average")) +
+  geom_line(aes(y = tesla_mm$mm30, color = "30-Day Moving Average")) +
+  ggtitle("Tesla Stock Prices and Moving Averages") +
+  xlab("Date") + ylab("Price") +
+  theme(plot.title = element_text(hjust = 0.5), panel.border = element_blank()) +
+  scale_x_date(date_labels = "%b %y", date_breaks = "1 year") +
+  scale_colour_manual("Series", values = c("Tesla Stock Price" = "black", "10-Day Moving Average" = "purple", "30-Day Moving Average" = "cyan"))
+```
+
+
+## Calculating Stock Returns
+
+The log return of a stock is a measure of the percentage change in the stock's value over a specific period, expressed as the natural logarithm of the ratio of the final price to the initial price. It is commonly used in finance and investment to represent the relative change in the value of an asset over time.
+
+The formula for calculating the log return (r) of a stock over a given period is:
+\[r_t = ln(1+R_t) = ln\frac{P_t}{P_(t-1)}\ = ln(P_t)-ln(P_t-1)\]
+
+
+## Calculate Tesla Returns
+
+```{r, message = F, echo = F}
+teslareturn <- diff(log(tesla[,6]))
+teslareturn <- teslareturn[-1,]
+summary(teslareturn)
+sd(teslareturn)
+```
+
+
+## Tesla Returns Series
+
+```{r, message = F, echo = F}
+ggplot(teslareturn, aes(x = index(teslareturn), y = teslareturn)) +
+  geom_line(color = "pink") +
+  ggtitle("Tesla Returns Series") +
+  xlab("Date") + ylab("Return") +
+  theme(plot.title = element_text(hjust = 0.5)) + 
+  scale_x_date(date_labels = "%b %y", date_breaks = "6 months")
+```
+
+
+## Overall Analysis
+
+<font size = "4">
+Mean Return: The mean (average) return for Tesla is approximately 0.001851 or 0.1851%. This represents the average return over the specified time period.
+
+Median Return: The median return, which is the middle value when returns are sorted in ascending order, is 0.001999 or 0.1999%. This provides an insight into the central tendency of the returns distribution.
+
+Standard Deviation: The standard deviation is a measure of the dispersion or volatility of returns. A standard deviation of 0.04106578 indicates the degree of variation in the returns. Higher standard deviation values suggest greater volatility.
+
+Quartiles: The first quartile (25th percentile) is -0.018147, and the third quartile (75th percentile) is 0.021982. These values give an idea of the spread of returns within the lower and upper 25% and 75% of the distribution, respectively.
+
+Minimum and Maximum Returns: The minimum return is -0.236518, and the maximum return is 0.181445. These values represent the extremes of the return distribution.
+</font>
+
+## Conclusion
+
+In summary, the statistics provide an overview of the central tendency, variability, and distribution of Tesla returns over the specified time period. The positive mean and median returns suggest a generally positive trend in the stock, while the standard deviation indicates the level of volatility. Understanding these metrics can assist investors in assessing risk and making informed decisions based on their investment objectives and risk tolerance.
+
+
